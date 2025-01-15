@@ -1,0 +1,205 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VentraS Test UI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        canvas {
+            width: 100%;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section">
+            <h2>수입/지출 입력</h2>
+            <label for="date">날짜:</label>
+            <input type="date" id="date">
+
+            <label for="amount">금액:</label>
+            <input type="number" id="amount" placeholder="금액 입력">
+
+            <label for="category">카테고리:</label>
+            <select id="category">
+                <option value="Production">생산비용</option>
+                <option value="Marketing">마케팅</option>
+                <option value="Shipping">배송비용</option>
+                <option value="Others">기타</option>
+            </select>
+
+            <button id="add-transaction">추가하기</button>
+        </div>
+
+        <div class="section results">
+            <h2>결과 보기</h2>
+            <p><strong>총 수입:</strong> <span id="total-income">0</span></p>
+            <p><strong>총 지출:</strong> <span id="total-expense">0</span></p>
+            <p><strong>잔액:</strong> <span id="balance">0</span></p>
+            <canvas id="category-chart"></canvas>
+        </div>
+
+        <div class="section comparison">
+            <h2>예상 비용 vs 실제 비용</h2>
+            <p><strong>예상 비용:</strong> <span id="expected-cost">0</span></p>
+            <p><strong>실제 비용:</strong> <span id="actual-cost">0</span></p>
+            <p><strong>차이:</strong> <span id="cost-difference">0</span></p>
+            <canvas id="cost-comparison-chart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const transactions = [];
+        const expectedCosts = {
+            Production: 500,
+            Marketing: 300,
+            Shipping: 200,
+            Others: 100
+        };
+
+        document.getElementById('add-transaction').addEventListener('click', () => {
+            const date = document.getElementById('date').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const category = document.getElementById('category').value;
+
+            if (!date || isNaN(amount) || !category) {
+                alert('모든 입력값을 채워주세요.');
+                return;
+            }
+
+            transactions.push({ date, amount, category });
+            updateResults();
+        });
+
+        function updateResults() {
+            const income = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+            const expense = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            const balance = income - expense;
+
+            document.getElementById('total-income').textContent = income.toFixed(2);
+            document.getElementById('total-expense').textContent = expense.toFixed(2);
+            document.getElementById('balance').textContent = balance.toFixed(2);
+
+            updateCharts();
+            updateComparison();
+        }
+
+        function updateCharts() {
+            const categories = {};
+            transactions.forEach(t => {
+                if (!categories[t.category]) {
+                    categories[t.category] = 0;
+                }
+                categories[t.category] += Math.abs(t.amount);
+            });
+
+            const ctx = document.getElementById('category-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(categories),
+                    datasets: [{
+                        label: '카테고리별 금액',
+                        data: Object.values(categories),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateComparison() {
+            let totalExpected = 0;
+            let totalActual = 0;
+
+            for (const category in expectedCosts) {
+                const actual = transactions
+                    .filter(t => t.category === category)
+                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+                totalExpected += expectedCosts[category];
+                totalActual += actual;
+            }
+
+            const difference = totalExpected - totalActual;
+
+            document.getElementById('expected-cost').textContent = totalExpected.toFixed(2);
+            document.getElementById('actual-cost').textContent = totalActual.toFixed(2);
+            document.getElementById('cost-difference').textContent = difference.toFixed(2);
+
+            const ctx = document.getElementById('cost-comparison-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(expectedCosts),
+                    datasets: [
+                        {
+                            label: '예상 비용',
+                            data: Object.values(expectedCosts),
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '실제 비용',
+                            data: Object.keys(expectedCosts).map(category =>
+                                transactions
+                                    .filter(t => t.category === category)
+                                    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+                            ),
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+</html>
